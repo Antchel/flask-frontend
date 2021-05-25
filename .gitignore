@@ -1,0 +1,3 @@
+venv
+.idea
+app/link_shortener.db

@@ -1,0 +1,36 @@
+{% extends 'login_tmpl.html' %}
+
+{% block content %}
+
+<h2> Edit menu </h2>
+<div class="container">
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="alert alert-warning" role="alert">
+            {% for message in messages %}
+                {{ message }}<br>
+            {% endfor %}
+        </div>
+        {% endif %}
+    {% endwith %}
+    {% for field, errors in form.errors.items() %}
+        <small class="form-text text-muted ">
+            {{ ', '.join(errors) }}
+        </small>
+    {% endfor %}
+<form action="" method="post">
+    <p>
+        {{form.human_link.label}} <br>
+        {{form.human_link(size=30)}}
+    </p>
+    <p>
+        {{form.link_type.label}} <br>
+        {{form.link_type}}
+    </p>
+    <p>
+        {{form.submit()}}
+    </p>
+</form>
+</div>
+
+{% endblock %}

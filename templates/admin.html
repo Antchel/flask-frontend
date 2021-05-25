@@ -1,0 +1,33 @@
+{% extends 'login_tmpl.html' %}
+
+{% block content %}
+
+<h1 xmlns="http://www.w3.org/1999/html">{% block title %} Admin page {% endblock %}</h1>
+    <table  class="display nowrap" border="1" cellspacing="50" width="1000" BGCOLOR="#EBDFF9" >
+        <thead>
+            <tr>
+                <th style="text-align: center;" width="100" scope="col">Delete</th>
+                <th style="text-align: center;" width="20%" scope="col">Username</th>
+            </tr>
+        </thead>
+        <tbody>
+        <form action="" method="post">
+            {% for url in urls %}
+                <tr>
+                    <th scope="row" width="10" style="text-align: center;">
+                        <form action="/delete" method="post" class="form-inline pull-left">
+                           <div class="input-append">
+                                <a href="/delete_user/{{url[0]}}"> {{loop.index}} </a>
+                           </div>
+                        </form>
+                    </th>
+                    <td scope="row" style="word-break: break-all;" width="20%">
+                        <a href="{{ url[3] }} "> {{ url[1] }} </a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </form>
+        </tbody>
+    </table>
+
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'login_tmpl.html' %}
+
+{% block content %}
+<h1 xmlns="http://www.w3.org/1999/html">
+    {% block title %}
+        Welcome to Link Shortener
+        <br>
+        If you want to get more features, please login!
+    {% endblock %}
+    <br>
+    <br>
+</h1>
+    {% for field, errors in form.errors.items() %}
+        <small class="form-text text-muted ">
+            {{ ', '.join(errors) }}
+        </small>
+    {% endfor %}
+<form action="" method="post">
+    <p>
+        {{form.source_link.label}}
+        {{form.source_link(size=40)}}
+    </p>
+    <p>
+        {{form.submit()}}
+    </p>
+</form>
+    {% if short_url %}
+        <hr>
+        <span>{{ short_url }}</span>
+    {% endif %}
+    <br>
+</div>
+{% endblock %}

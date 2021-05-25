@@ -1,0 +1,75 @@
+{% extends 'tmpl.html' %}
+
+{% block content %}
+
+<h1 xmlns="http://www.w3.org/1999/html">{% block title %} FlaskShortener Statistics for {{ session['username'] }} {% endblock %}</h1>
+    <table  class="display nowrap" border="1" cellspacing="50" width="1000" BGCOLOR="#EBDFF9" >
+        <thead>
+            <tr>
+                <th style="text-align: center;" width="100" scope="col">Delete</th>
+                <th style="text-align: center;" width="20%" scope="col">Short</th>
+                <th style="text-align: center;" width="20%" scope="col">Original</th>
+                <th style="text-align: center;" width="100" scope="col">Pseudonym</th>
+                <th style="text-align: center;" width="100" scope="col">Link type</th>
+                <th style="text-align: center;" width="100" scope="col">Clicks</th>
+                <th style="text-align: center;" width="100" scope="col">Creation Date</th>
+                <th style="text-align: center;" width="100" scope="col">Edit</th>
+            </tr>
+        </thead>
+        <tbody>
+        <form action="" method="post">
+            {% for url in urls %}
+                <tr>
+                    <th scope="row" width="10" style="text-align: center;">
+                        <form action="/delete" method="post" class="form-inline pull-left">
+                           <div class="input-append">
+                                <a href="/delete/{{url[0]}}"> {{loop.index}} </a>
+                           </div>
+                        </form>
+                    </th>
+                    <td scope="row" style="word-break: break-all;" width="20%">
+                        <a href="{{ url[3] }} "> {{ url[3] }} </a>
+                    </td>
+                    <td scope="row" style="word-break: break-all;" width="40%">
+                        <a href="{{ url[2] }}"> {{ url[2] }} </a>
+                    </td>
+                    <td>
+                        <a href="{{ url[4] }}"> {{ url[4] }} </a>
+                        <br>
+                        {% if url[4] %}
+                            <form action="/update" method="post" class="form-inline pull-left">
+                                <div class="input-append">
+                                   <a href="/update/{{url[0]}}"> Remove attribute </a>
+                               </div>
+                            </form>
+                        {% endif %}
+                    </td>
+                    <td scope="row" style="text-align: center;" width="100">
+                        {% if 1 == url[5] %}
+                            general
+                        {% elif 2 == url[5] %}
+                            public
+                        {% else %}
+                            private
+                        {% endif %}
+                    </td>
+                    <td scope="row" style="text-align: center;" width="5%">
+                        {{ url[7] }}
+                    </td>
+                    <td scope="row" style="text-align: center;" width="5%">
+                        {{ url[1] }}
+                    </td>
+                    <td scope="row" style="text-align: center;" width="5%">
+                        <form action="/edit" method="post" class="form-inline pull-left">
+                           <div class="input-append">
+                                <a href="/edit/{{url[0]}}"> Edit </a>
+                           </div>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+        </form>
+        </tbody>
+    </table>
+
+{% endblock %}

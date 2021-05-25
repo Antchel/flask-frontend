@@ -1,0 +1,26 @@
+{% extends 'login_tmpl.html' %}
+
+{% block content %}
+<h2> Authorization </h2>
+<div class="container">
+        {% for field, errors in form.errors.items() %}
+            <small class="form-text text-muted ">
+                {{ ', '.join(errors) }}
+            </small>
+        {% endfor %}
+<form action="" method="post">
+    <p>
+        {{form.username.label}} <br>
+        {{form.username(size=30)}}
+    </p>
+    <p>
+        {{form.password.label}} <br>
+        {{form.password(size=30)}}
+    </p>
+    <p>
+        {{form.submit()}}
+    </p>
+</form>
+</div>
+
+{% endblock %}
