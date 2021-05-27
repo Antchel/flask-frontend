@@ -11,29 +11,11 @@ import datetime
 from flask_jwt_extended.exceptions import NoAuthorizationError
 from forms import SignUpForm, RegisterForm, CreateLinkForm, EditLinkForm, AuthorizationForm, FreeLinkForm
 
-con = lite.connect('link_shortener.db', check_same_thread=False)
-cur = con.cursor()
-
-# cur.execute('CREATE TABLE IF NOT EXISTS urls ('
-#             'id INTEGER PRIMARY KEY AUTOINCREMENT,'
-#             'created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,'
-#             'original_url TEXT NOT NULL,'
-#             'short_url TEXT,'
-#             'human_url TEXT,'
-#             'link_type INTEGER,'
-#             'username TEXT,'
-#             'clicks INTEGER NOT NULL DEFAULT 0)')
-#
-# cur.execute('CREATE TABLE IF NOT EXISTS users ('
-#             'id	INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT UNIQUE,'
-#             'username	TEXT NOT NULL UNIQUE,'
-#             'password	TEXT NOT NULL)')
-
 app = Flask(__name__, template_folder='../templates')
 app.config['SECRET_KEY'] = 'sdgjh48i3kjg'
 app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 
-app.config['JWT_TOKEN_LOCATION'] = ['headers', 'cookies']
+app.config['JWT_TOKEN_LOCATION'] = ['cookies']
 # Change this in your code!
 app.config["JWT_SECRET_KEY"] = "super-secret"
 
@@ -52,18 +34,14 @@ def expired_token_callback(jwt_header, jwt_payload):
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     form = RegisterForm()
-    if request.method == "POST":
-        resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}?'
+    if request.method == "POST" and form.validate():
+        resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}/register?'
                              f'username={form.username.data}&password={form.password.data}'
                              f'&valid_password={form.valid_password.data}')
-        print(resp.json())
-        print(request.host_url)
-        print(request.host)
-        print("register", resp.status_code)
         if resp.status_code > 202:
-            flash(f"{resp.json()}")
+            flash(f"{resp.json()['msg']}")
             return render_template('register.html', form=form)
-        flash(f"{resp.json()[0]}")
+        flash(f"{resp.json()['msg']}")
         return redirect(url_for('log'))
     if request.method == 'GET':
         return render_template('register.html', form=form)
@@ -79,17 +57,13 @@ def log():
     if request.method == 'POST' and form.validate():
         resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}?'
                              f'username={form.username.data}&password={form.password.data}')
-        print(resp.json())
-        print(f"{request.host_url.partition(':5')[0]}:{backend_port}")
-        print("login", resp.status_code)
         if resp.status_code > 202:
             flash(f"{resp.json()}")
             return render_template('login.html', form=form)
-        # access_token = create_access_token(identity=form.username.data,
-        #                                    expires_delta=datetime.timedelta(seconds=expiration_time))
         session['username'] = form.username.data
         respon = make_response(redirect(url_for('linkage')))
         set_access_cookies(respon, resp.json()['JWT'])
+        respon.set_cookie('access_token', resp.json()['JWT'])
         return respon
     if request.method == 'GET':
         return render_template('login.html', form=form)
@@ -103,22 +77,23 @@ def linkage():
         flash('Login please!')
         return redirect(url_for('log'))
     form = CreateLinkForm()
-    if request.method == 'POST':
-        print("Send request")
+    if request.method == 'POST' and form.validate():
+        cookies = {'access_token_cookie': request.cookies.get('access_token')}
         resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}/linkage?'
                              f'source_link={form.source_link.data}'
                              f'&human_link={form.human_link.data}'
                              f'&link_type={form.link_type.data}'
-                             f'&username={session["username"]}')
+                             f'&username={session["username"]}', cookies=cookies)
         if resp.status_code > 202:
             flash(resp.json()['msg'])
             return render_template('linkage.html', form=form,
                                    short_url=None,
                                    human_url=None)
-
-        return render_template('linkage.html', form=form,
-                               short_url=resp.json()[0]['short_url'],
-                               human_url=resp.json()[0]['attribute'])
+        else:
+            print(resp.json()['short_url'])
+            return render_template('linkage.html', form=form,
+                                   short_url=resp.json()['short_url'],
+                                   human_url=resp.json()['attribute'])
 
     if request.method == 'GET':
         return render_template('linkage.html', form=form,
@@ -130,12 +105,16 @@ def linkage():
 def url_redirect(url_name):
     session['URL'] = url_name
     full_url = request.host_url + url_name
+    cookies = {'access_token_cookie': request.cookies.get('access_token')}
     resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}/{url_name}/?'
-                         f'full_url={full_url}')
-    print(resp.json())
-    print(resp.json()[0]['original_id'])
+                         f'full_url={full_url}', cookies=cookies)
     if resp.status_code <= 202:
-        return redirect(resp.json()[0]['original_id'])
+        return redirect(resp.json()['original_id'])
+    if resp.status_code == 403:
+        flash("Please, authorize!")
+        return redirect(f"{request.host_url}/authorize/{url_name}")
+    else:
+        return redirect(f"{request.host_url}/authorize/{url_name}")
 
 
 @app.route('/page404', methods=["GET", "POST"])
@@ -149,7 +128,7 @@ def stats():
     if request.method == "GET":
         resp = requests.get(f'{request.host_url.partition(":5")[0]}:{backend_port}/stats?'
                             f'username={session["username"]}')
-        urls_list = resp.json()[0]["urls_list"]
+        urls_list = resp.json()["urls_list"]
         return render_template('stats.html', urls=urls_list)
 
 
@@ -194,8 +173,8 @@ def edit(edit_id):
                               f'&edit_id={edit_id}'
                               f'&psydo={human_url}'
                               f'&link_type={form.link_type.data}')
-        # if resp.status_code > 202:
-        #     flash(resp.json()[0]['msg'])
+        if resp.status_code > 202:
+            flash(resp.json()['msg'])
         return redirect(url_for('stats'))
     return render_template('edit_form.html', form=form)
 
@@ -204,12 +183,15 @@ def edit(edit_id):
 def authorize(url):
     form = AuthorizationForm()
     if request.method == 'POST' and form.validate():
-        resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}/authorize/{url}?'
-                             f'username={form.password.data}'
-                             f'&password={form.username.data}')
+        resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}/authorize/{url}/?'
+                             f'username={form.username.data}'
+                             f'&password={form.password.data}')
         if resp.status_code <= 202:
-            redirect(resp.json()[0]['redirect_url'])
+            response = make_response(redirect(resp.json()['redirect_url']))
+            response.set_cookie('access_token', resp.json()['access_token'])
+            return response
         else:
+            flash(resp.json()['msg'])
             return render_template('authorize.html', form=form)
     if request.method == 'GET':
         return render_template('authorize.html', form=form)
@@ -223,19 +205,6 @@ def about():
         return render_template('about.html')
 
 
-# @app.route('/admin', methods=['GET', "POST"])
-# def admin():
-#     if session['username'] == 'Admin':
-#         urls = cur.execute("SELECT * FROM users")
-#         if request.method == "GET":
-#             return render_template('admin.html', urls=urls)
-#         if request.method == "POST":
-#             return render_template('admin.html', urls=urls)
-#     else:
-#         flash("Login as 'Admin' and try again")
-#         return redirect(url_for('log'))
-
-
 @app.route('/free_link', methods=['GET', "POST"])
 def free_link():
     form = FreeLinkForm()
@@ -244,7 +213,7 @@ def free_link():
     if request.method == 'POST' and form.validate():
         resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}/free_link?'
                              f'source_link={form.source_link.data}')
-        short_url = resp.json()[0]['short_url']
+        short_url = resp.json()['short_url']
         return render_template('free_link.html', form=form, short_url=short_url)
     return render_template('free_link.html', form=form)
 
