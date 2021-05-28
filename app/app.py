@@ -1,14 +1,7 @@
-import hashlib
-import math
-import uuid
 import bcrypt
 import requests
 from flask import Flask, render_template, url_for, redirect, flash, session, request, make_response
-from flask_jwt_extended import JWTManager, create_access_token, verify_jwt_in_request, \
-    set_access_cookies, get_jwt_identity
-import sqlite3 as lite
-import datetime
-from flask_jwt_extended.exceptions import NoAuthorizationError
+from flask_jwt_extended import JWTManager, set_access_cookies
 from forms import SignUpForm, RegisterForm, CreateLinkForm, EditLinkForm, AuthorizationForm, FreeLinkForm
 
 app = Flask(__name__, template_folder='../templates')
@@ -16,13 +9,15 @@ app.config['SECRET_KEY'] = 'sdgjh48i3kjg'
 app.config["JWT_COOKIE_CSRF_PROTECT"] = False
 
 app.config['JWT_TOKEN_LOCATION'] = ['cookies']
-# Change this in your code!
+
 app.config["JWT_SECRET_KEY"] = "super-secret"
 
 jwt = JWTManager(app)
 salt = bcrypt.gensalt()
 expiration_time = 200
 backend_port = 5001
+
+cookies = {'access_token_cookie': ""}
 
 
 @jwt.expired_token_loader
@@ -52,6 +47,7 @@ def register():
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/log', methods=['GET', 'POST'])
 def log():
+    global cookies
     session['username'] = "guest"
     form = SignUpForm()
     if request.method == 'POST' and form.validate():
@@ -62,6 +58,7 @@ def log():
             return render_template('login.html', form=form)
         session['username'] = form.username.data
         respon = make_response(redirect(url_for('linkage')))
+        cookies = {'access_token_cookie': resp.json()['JWT']}
         set_access_cookies(respon, resp.json()['JWT'])
         respon.set_cookie('access_token', resp.json()['JWT'])
         return respon
@@ -73,6 +70,7 @@ def log():
 
 @app.route('/linkage', methods=['GET', 'POST'])
 def linkage():
+    global cookies
     if session['username'] == "guest":
         flash('Login please!')
         return redirect(url_for('log'))
@@ -90,7 +88,6 @@ def linkage():
                                    short_url=None,
                                    human_url=None)
         else:
-            print(resp.json()['short_url'])
             return render_template('linkage.html', form=form,
                                    short_url=resp.json()['short_url'],
                                    human_url=resp.json()['attribute'])
@@ -126,8 +123,12 @@ def err_page():
 @app.route('/stats', methods=["GET", "POST"])
 def stats():
     if request.method == "GET":
+        cookies = {'access_token_cookie': request.cookies.get('access_token')}
         resp = requests.get(f'{request.host_url.partition(":5")[0]}:{backend_port}/stats?'
-                            f'username={session["username"]}')
+                            f'username={session["username"]}', cookies=cookies)
+        if resp.status_code > 202:
+            flash(resp.json()['msg'])
+            return redirect(url_for('log'))
         urls_list = resp.json()["urls_list"]
         return render_template('stats.html', urls=urls_list)
 
@@ -136,7 +137,7 @@ def stats():
 def delete(del_id):
     resp = requests.delete(f'{request.host_url.partition(":5")[0]}:{backend_port}/stats?'
                            f'username={session["username"]}'
-                           f'&del_id={del_id}')
+                           f'&del_id={del_id}', cookies=cookies)
     if resp.status_code > 202:
         flash(resp.json()['msg'])
     return redirect(url_for('stats'))
@@ -145,7 +146,7 @@ def delete(del_id):
 @app.route('/delete_user/<del_id>')
 def delete_user(del_id):
     resp = requests.delete(f'{request.host_url.partition(":5")[0]}:{backend_port}/delete_user?'
-                           f'&del_id={del_id}')
+                           f'&del_id={del_id}', cookies=cookies)
     if resp.status_code > 202:
         flash(resp.json()['msg'])
     return redirect(url_for('admin'))
@@ -155,7 +156,7 @@ def delete_user(del_id):
 def delete_attr(del_id):
     resp = requests.patch(f'{request.host_url.partition(":5")[0]}:{backend_port}/stats?'
                            f'username={session["username"]}'
-                           f'&del_id={del_id}')
+                           f'&del_id={del_id}', cookies=cookies)
     if resp.status_code > 202:
         flash(resp.json()['msg'])
     return redirect(url_for('stats'))
@@ -172,7 +173,7 @@ def edit(edit_id):
                               f'username={session["username"]}'
                               f'&edit_id={edit_id}'
                               f'&psydo={human_url}'
-                              f'&link_type={form.link_type.data}')
+                              f'&link_type={form.link_type.data}', cookies=cookies)
         if resp.status_code > 202:
             flash(resp.json()['msg'])
         return redirect(url_for('stats'))
@@ -181,6 +182,7 @@ def edit(edit_id):
 
 @app.route('/authorize/<url>/', methods=['GET', 'POST'])
 def authorize(url):
+    global cookies
     form = AuthorizationForm()
     if request.method == 'POST' and form.validate():
         resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}/authorize/{url}/?'
@@ -189,6 +191,7 @@ def authorize(url):
         if resp.status_code <= 202:
             response = make_response(redirect(resp.json()['redirect_url']))
             response.set_cookie('access_token', resp.json()['access_token'])
+            cookies = {'access_token_cookie': resp.json()['JWT']}
             return response
         else:
             flash(resp.json()['msg'])
@@ -213,6 +216,9 @@ def free_link():
     if request.method == 'POST' and form.validate():
         resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}/free_link?'
                              f'source_link={form.source_link.data}')
+        if resp.status_code > 202:
+            flash("Something goes wrong!")
+            return redirect(url_for("err_page"))
         short_url = resp.json()['short_url']
         return render_template('free_link.html', form=form, short_url=short_url)
     return render_template('free_link.html', form=form)
