@@ -58,7 +58,7 @@ def log():
             return render_template('login.html', form=form)
         session['username'] = form.username.data
         respon = make_response(redirect(url_for('linkage')))
-        cookies = {'access_token_cookie': resp.json()['JWT']}
+        cookies = {'access_token_cookie': request.cookies.get('access_token')}
         set_access_cookies(respon, resp.json()['JWT'])
         respon.set_cookie('access_token', resp.json()['JWT'])
         return respon
@@ -76,7 +76,6 @@ def linkage():
         return redirect(url_for('log'))
     form = CreateLinkForm()
     if request.method == 'POST' and form.validate():
-        cookies = {'access_token_cookie': request.cookies.get('access_token')}
         resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}/linkage?'
                              f'source_link={form.source_link.data}'
                              f'&human_link={form.human_link.data}'
@@ -96,7 +95,10 @@ def linkage():
         return render_template('linkage.html', form=form,
                                short_url=None,
                                human_url=None)
-
+    else:
+        return render_template('linkage.html', form=form,
+                               short_url=None,
+                               human_url=None)
 
 @app.route('/<url_name>/')
 def url_redirect(url_name):
@@ -137,7 +139,7 @@ def stats():
 def delete(del_id):
     resp = requests.delete(f'{request.host_url.partition(":5")[0]}:{backend_port}/stats?'
                            f'username={session["username"]}'
-                           f'&del_id={del_id}', cookies=cookies)
+                           f'&del_id={del_id}')
     if resp.status_code > 202:
         flash(resp.json()['msg'])
     return redirect(url_for('stats'))
@@ -146,7 +148,7 @@ def delete(del_id):
 @app.route('/delete_user/<del_id>')
 def delete_user(del_id):
     resp = requests.delete(f'{request.host_url.partition(":5")[0]}:{backend_port}/delete_user?'
-                           f'&del_id={del_id}', cookies=cookies)
+                           f'&del_id={del_id}')
     if resp.status_code > 202:
         flash(resp.json()['msg'])
     return redirect(url_for('admin'))
@@ -156,7 +158,7 @@ def delete_user(del_id):
 def delete_attr(del_id):
     resp = requests.patch(f'{request.host_url.partition(":5")[0]}:{backend_port}/stats?'
                            f'username={session["username"]}'
-                           f'&del_id={del_id}', cookies=cookies)
+                           f'&del_id={del_id}')
     if resp.status_code > 202:
         flash(resp.json()['msg'])
     return redirect(url_for('stats'))
@@ -168,12 +170,15 @@ def edit(edit_id):
     if request.method == "GET":
         return render_template('edit_form.html', form=form)
     if request.method == "POST" and form.validate():
-        human_url = request.host_url + form.human_link.data
+        if form.human_link.data:
+            human_url = request.host_url + form.human_link.data
+        else:
+            human_url = ""
         resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}/stats?'
                               f'username={session["username"]}'
                               f'&edit_id={edit_id}'
                               f'&psydo={human_url}'
-                              f'&link_type={form.link_type.data}', cookies=cookies)
+                              f'&link_type={form.link_type.data}')
         if resp.status_code > 202:
             flash(resp.json()['msg'])
         return redirect(url_for('stats'))
@@ -182,7 +187,6 @@ def edit(edit_id):
 
 @app.route('/authorize/<url>/', methods=['GET', 'POST'])
 def authorize(url):
-    global cookies
     form = AuthorizationForm()
     if request.method == 'POST' and form.validate():
         resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}/authorize/{url}/?'
@@ -191,7 +195,6 @@ def authorize(url):
         if resp.status_code <= 202:
             response = make_response(redirect(resp.json()['redirect_url']))
             response.set_cookie('access_token', resp.json()['access_token'])
-            cookies = {'access_token_cookie': resp.json()['JWT']}
             return response
         else:
             flash(resp.json()['msg'])
