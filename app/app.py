@@ -100,6 +100,7 @@ def linkage():
                                short_url=None,
                                human_url=None)
 
+
 @app.route('/<url_name>/')
 def url_redirect(url_name):
     session['URL'] = url_name
