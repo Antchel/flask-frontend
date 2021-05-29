@@ -76,6 +76,9 @@ def linkage():
         return redirect(url_for('log'))
     form = CreateLinkForm()
     if request.method == 'POST' and form.validate():
+        print(form.source_link.data)
+        print(form.link_type.data)
+        print(form.human_link.data)
         resp = requests.post(f'{request.host_url.partition(":5")[0]}:{backend_port}/linkage?'
                              f'source_link={form.source_link.data}'
                              f'&human_link={form.human_link.data}'
@@ -140,7 +143,7 @@ def stats():
 def delete(del_id):
     resp = requests.delete(f'{request.host_url.partition(":5")[0]}:{backend_port}/stats?'
                            f'username={session["username"]}'
-                           f'&del_id={del_id}')
+                           f'&del_id={del_id}', cookies=cookies)
     if resp.status_code > 202:
         flash(resp.json()['msg'])
     return redirect(url_for('stats'))
@@ -149,7 +152,7 @@ def delete(del_id):
 @app.route('/delete_user/<del_id>')
 def delete_user(del_id):
     resp = requests.delete(f'{request.host_url.partition(":5")[0]}:{backend_port}/delete_user?'
-                           f'&del_id={del_id}')
+                           f'&del_id={del_id}', cookies=cookies)
     if resp.status_code > 202:
         flash(resp.json()['msg'])
     return redirect(url_for('admin'))
@@ -159,7 +162,7 @@ def delete_user(del_id):
 def delete_attr(del_id):
     resp = requests.patch(f'{request.host_url.partition(":5")[0]}:{backend_port}/stats?'
                            f'username={session["username"]}'
-                           f'&del_id={del_id}')
+                           f'&del_id={del_id}', cookies=cookies)
     if resp.status_code > 202:
         flash(resp.json()['msg'])
     return redirect(url_for('stats'))
@@ -179,7 +182,7 @@ def edit(edit_id):
                               f'username={session["username"]}'
                               f'&edit_id={edit_id}'
                               f'&psydo={human_url}'
-                              f'&link_type={form.link_type.data}')
+                              f'&link_type={form.link_type.data}', cookies=cookies)
         if resp.status_code > 202:
             flash(resp.json()['msg'])
         return redirect(url_for('stats'))
